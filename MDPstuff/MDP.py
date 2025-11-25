@@ -331,7 +331,7 @@ class GridWorldMDP:
 
                         
 
-
+"""
 gridworld = GridWorldMDP()
 
 print("Policy = ",gridworld.policy)
@@ -361,7 +361,7 @@ for x in range(0, 10):
 
 #for i in range(10):
     #print(' '.join(gridworld.policy[(i,j)] for j in range(10)))
-
+"""
 
 
 class TranSys:

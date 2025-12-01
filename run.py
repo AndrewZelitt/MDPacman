@@ -10,6 +10,7 @@ from pauser import Pause
 from text import TextGroup
 from sprites import LifeSprites
 from sprites import MazeSprites
+import time
 
 class GameController(object):
     def __init__(self):
@@ -100,6 +101,11 @@ class GameController(object):
 
         if self.pacman.alive:
             if not self.pause.paused:
+                #self.pause.setPause()
+                #emulating needing to do the calculations every time.
+                #need to keep compute time to sub 100 ms (shouldnt be too bad)
+                #largecalculations()
+                #self.pause.setPause()
                 self.pacman.update(dt)
         else:
             self.pacman.update(dt)
@@ -109,6 +115,30 @@ class GameController(object):
             afterPauseMethod()
         self.checkEvents()
         self.render()
+        
+        print("this is the powerpellet list")
+        for pellet in self.pellets.pelletList:
+            if pellet.name == POWERPELLET:
+                print(pellet.coord)
+        print("this is the pellet list")
+        for pellet in self.pellets.pelletList:
+            if pellet.name != POWERPELLET:
+                print(pellet.coord)
+        print("Ghost Positions:")
+        for ghost in self.ghosts:
+            print({round(ghost.position.x/TILEWIDTH)} , {round(ghost.position.y/TILEHEIGHT)})
+        if self.fruit != None:
+            print("Fruit Position:")
+            print({self.fruit.position.x/TILEWIDTH} , {self.fruit.position.y/TILEHEIGHT})
+       
+        # powerpellets will have a higher reward normally than non power pellets, this will need to update each time.
+        # use row and col to do calculations, you can just divide the values by the tilewidth and height to get the closest coordinate
+        print(f"Pacman Position:\n {round(self.pacman.position.x/TILEWIDTH)} , {round(self.pacman.position.y/TILEHEIGHT)}")
+        print("\n")
+        
+        
+
+    
 
     def updateScore(self, points):
         self.score += points
@@ -202,6 +232,17 @@ class GameController(object):
             y = SCREENHEIGHT - self.lifesprites.images[i].get_height()
             self.screen.blit(self.lifesprites.images[i], (x, y))
         pygame.display.update()
+def largecalculations():
+        start = time.perf_counter()
+        for m in range(30):
+            x = 0
+            for i in range(1, 100000):
+                x *= i
+                x /= i
+        end = time.perf_counter()
+
+        print(f"overall time = {(end - start)}")
+        return
 
     
 if __name__ == "__main__":

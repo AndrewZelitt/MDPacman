@@ -7,6 +7,7 @@ class Pellet(object):
     def __init__(self, row, column):
         self.name = PELLET
         self.position = Vector2(column*TILEWIDTH, row*TILEHEIGHT)
+        self.coord = (column, row)
         self.color = WHITE
         
         self.radius = int(2 * TILEWIDTH / 16)

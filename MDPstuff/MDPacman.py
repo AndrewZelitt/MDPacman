@@ -55,12 +55,8 @@ while not done:
     # Select the font to use, size, bold, italics
     font = pygame.font.SysFont('Calibri', 25, True, False)
  
-    # Render the text. "True" means anti-aliased text.
-    # Black is the color. This creates an image of the
-    # letters, but does not put it on the screen
     text = font.render("MDPacman", True, WHITE)
  
-    
     screen.blit(text, [screen_height/2 - text.get_width()/2, 0])
 
     instruct = font.render("Press Space to Start", True, WHITE)

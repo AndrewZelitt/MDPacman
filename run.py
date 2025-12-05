@@ -21,13 +21,13 @@ class GameController(object):
         self.fruit = None
         self.pause = Pause(True)
         self.level = 0
-        self.lives = 5
+        self.lives = 1
         self.score = 0
         self.textgroup = TextGroup()
         self.lifesprites = LifeSprites(self.lives)
 
     def restartGame(self):
-        self.lives = 5
+        self.lives = 1
         self.level = 0
         self.pause.paused = True
         self.fruit = None
@@ -88,7 +88,7 @@ class GameController(object):
     #this is the main loop of the program this is where a lot of code will go that will give information.
     def update(self):
         dt = self.clock.tick(30) / 1000.0
-        #dt = self.clock.tick(5) / 1000.0
+        #dt = self.clock.tick(1000) / 1000.0
         self.textgroup.update(dt)
         self.pellets.update(dt)
         if not self.pause.paused:
@@ -115,7 +115,7 @@ class GameController(object):
             afterPauseMethod()
         self.checkEvents()
         self.render()
-        
+        """
         print("this is the powerpellet list")
         for pellet in self.pellets.pelletList:
             if pellet.name == POWERPELLET:
@@ -135,7 +135,7 @@ class GameController(object):
         # use row and col to do calculations, you can just divide the values by the tilewidth and height to get the closest coordinate
         print(f"Pacman Position:\n {round(self.pacman.position.x/TILEWIDTH)} , {round(self.pacman.position.y/TILEHEIGHT)}")
         print("\n")
-        
+        """
         
 
     

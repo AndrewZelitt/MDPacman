@@ -23,6 +23,7 @@ class Entity(object):
         self.directionMethod = self.goalDirection
         self.setStartNode(node)
         self.image = None
+        
 
     def setStartNode(self, node):
         self.node = node

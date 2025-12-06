@@ -11,6 +11,7 @@ class Node(object):
                        DOWN:[PACMAN, BLINKY, PINKY, INKY, CLYDE, FRUIT],
                        LEFT:[PACMAN, BLINKY, PINKY, INKY, CLYDE, FRUIT],
                        RIGHT:[PACMAN, BLINKY, PINKY, INKY, CLYDE, FRUIT]}
+        self.coords = (self.position.x/TILEWIDTH, self.position.y/TILEHEIGHT)
 
     def denyAccess(self, direction, entity):
         if entity.name in self.access[direction]:

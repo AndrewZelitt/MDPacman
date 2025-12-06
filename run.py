@@ -178,10 +178,10 @@ class GameController(object):
                     # do simulator instead of other thing.
                     
                     self.textgroup.showText(self.sco_id)
-                    #sco = run_pacman_simulation()
+                    sco = run_pacman_simulation(self, self.nodes, self.pacman.node.coords, self.ghosts, self.pellets.pelletList, 10000)
                     
                     self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
-                    self.sco += 100
+                    #self.sco += 100
                     
 
     def checkGhostEvents(self):

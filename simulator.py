@@ -1,6 +1,6 @@
 import nodes
-
-def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions, max_moves=10000):
+import constants
+def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_positions, max_moves=10000):
     """
     Run a Pacman simulation and return the final score.
     
@@ -16,7 +16,7 @@ def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions
     """
     # Initialize game state
     pacman_pos = pacman_start
-    ghost_positions = ghost_starts.copy()
+    ghost_positions = ghost_starts
     score = 0
     pellets_remaining = len(pellet_positions)
     power_mode = 0  # Turns remaining in power mode
@@ -24,7 +24,11 @@ def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions
     
     while moves < max_moves and pellets_remaining > 0:
         # Pacman collects pellets
-        current_node = game_map[pacman_pos]
+        print(pacman_pos)
+
+        # Need to figure this stuff up, just doing the movement for now.
+        """
+        current_node = self.pacman.node.coords
         
         if current_node.get('pellet', False):
             score += 10
@@ -40,6 +44,8 @@ def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions
             score += 200
             current_node['fruit'] = False
         
+        
+
         # Check ghost collisions
         if pacman_pos in ghost_positions:
             if power_mode > 0:
@@ -48,16 +54,18 @@ def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions
                 ghost_positions[ghost_idx] = ghost_starts[ghost_idx]  # Respawn ghost
             else:
                return score
-                
+        """        
         
         # Move Pacman (simple strategy: move toward nearest pellet)
         # this will be replaced with the mdp stuff
-        pacman_pos = move_pacman(game_map, pacman_pos, pellets_remaining)
+        pacman_pos = move_pacman(self, game_map, pacman_pos, pellets_remaining)
         
+
+        """
         # Move ghosts (simple chase strategy)
         ghost_positions = [move_ghost(game_map, ghost_pos, pacman_pos, power_mode > 0) 
                           for ghost_pos in ghost_positions]
-        
+        """
         # Decrease power mode
         if power_mode > 0:
             power_mode -= 1
@@ -71,19 +79,29 @@ def run_pacman_simulation(game_map, pacman_start, ghost_starts, pellet_positions
     return score
 
 
-def move_pacman(game_map, current_pos, pellets_remaining):
-    """Move Pacman toward nearest pellet."""
-    neighbors = game_map[current_pos].get('neighbors', [])
-    if not neighbors:
-        return current_pos
-    
-    # Simple strategy: pick random valid neighbor
-    # (In a real implementation, use BFS/A* to find nearest pellet)
+def move_pacman(self, game_map, current_pos, pellets_remaining):
     import random
-    return random.choice(neighbors)
+    rand = random.randrange(1, 5)
+
+    # ^^^ this will be replaced with the output from the Policys
+    
+    if rand == 1:
+        direction =  constants.UP
+    if rand == 2:
+        direction =  constants.DOWN
+    if rand == 3:
+        direction =  constants.LEFT
+    if rand == 4:
+        direction = constants.RIGHT
+    print("Rand = ", rand)
+    self.pacman.node = self.pacman.getNewTarget(direction)
+    self.pacman.setPosition()
+    return self.pacman.node.coords
+
+    
 
 
-def move_ghost(game_map, ghost_pos, pacman_pos, flee_mode):
+def move_ghost(self, game_map, ghost_pos, pacman_pos, flee_mode):
     """Move ghost toward (or away from) Pacman."""
     neighbors = game_map[ghost_pos].get('neighbors', [])
     if not neighbors:

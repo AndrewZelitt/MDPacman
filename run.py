@@ -10,6 +10,10 @@ from pauser import Pause
 from text import TextGroup
 from sprites import LifeSprites
 from sprites import MazeSprites
+import pygame_widgets
+from pygame_widgets.slider import Slider
+from pygame_widgets.textbox import TextBox
+from simulator import run_pacman_simulation
 import time
 
 class GameController(object):
@@ -23,6 +27,7 @@ class GameController(object):
         self.level = 0
         self.lives = 1
         self.score = 0
+        self.sco = 0
         self.textgroup = TextGroup()
         self.lifesprites = LifeSprites(self.lives)
 
@@ -83,7 +88,15 @@ class GameController(object):
         self.nodes.denyAccessList(15, 14, UP, self.ghosts)
         self.nodes.denyAccessList(12, 26, UP, self.ghosts)
         self.nodes.denyAccessList(15, 26, UP, self.ghosts)
-
+        self.slider = Slider(pygame.display.get_surface(), SCREENWIDTH/2 + 10, 5, 100, 10, min=1000, max=100000, step=1000)
+        self.slidertxt = self.textgroup.addText("1000", WHITE, SCREENWIDTH/2 - 100, 0, 50)
+        self.sco_id = self.textgroup.addText("Score: ", WHITE, SCREENWIDTH/2 - 100 , 20, 50)
+        
+        #output = TextBox(pygame.display, 0, 0, 50 , 50, fontSize=50, fontColor=WHITE)
+        #output.setText("TextBox")
+        #pygame.display.update()
+        
+        #output.disable()  # Act as label instead of textbox
 
     #this is the main loop of the program this is where a lot of code will go that will give information.
     def update(self):
@@ -145,7 +158,10 @@ class GameController(object):
         self.textgroup.updateScore(self.score)
 
     def checkEvents(self):
+        
         for event in pygame.event.get():
+            pygame_widgets.update(event)
+            self.textgroup.updateText(self.slidertxt, self.slider.getValue())
             if event.type == QUIT:
                 exit()
             elif event.type == KEYDOWN:
@@ -158,6 +174,15 @@ class GameController(object):
                         else:
                             self.textgroup.showText(PAUSETXT)
                             self.hideEntities()
+                elif event.key == K_s:
+                    # do simulator instead of other thing.
+                    
+                    self.textgroup.showText(self.sco_id)
+                    #sco = run_pacman_simulation()
+                    
+                    self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
+                    self.sco += 100
+                    
 
     def checkGhostEvents(self):
         for ghost in self.ghosts:
@@ -200,10 +225,9 @@ class GameController(object):
         if pellet:
             self.pellets.numEaten += 1
             self.updateScore(pellet.points)
-            if self.pellets.numEaten == 30:
-                self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky)
-            if self.pellets.numEaten == 70:
-                self.ghosts.clyde.startNode.allowAccess(LEFT, self.ghosts.clyde)
+            
+            self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky) 
+            self.ghosts.clyde.startNode.allowAccess(LEFT, self.ghosts.clyde)
             self.pellets.pelletList.remove(pellet)
             if pellet.name == POWERPELLET:
                self.ghosts.startFreight()
@@ -231,6 +255,8 @@ class GameController(object):
             x = self.lifesprites.images[i].get_width() * i
             y = SCREENHEIGHT - self.lifesprites.images[i].get_height()
             self.screen.blit(self.lifesprites.images[i], (x, y))
+        events = pygame.event.get()
+        pygame_widgets.update(events)
         pygame.display.update()
 def largecalculations():
         start = time.perf_counter()

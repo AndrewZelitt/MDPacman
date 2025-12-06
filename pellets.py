@@ -2,7 +2,7 @@ import pygame
 from vector import Vector2
 from constants import *
 import numpy as np
-
+import random
 class Pellet(object):
     def __init__(self, row, column):
         self.name = PELLET
@@ -51,16 +51,27 @@ class PelletGroup(object):
             powerpellet.update(dt)
                 
     def createPelletList(self, pelletfile):
-        data = self.readPelletfile(pelletfile)        
+        data = self.readPelletfile(pelletfile)
+              
         for row in range(data.shape[0]):
             for col in range(data.shape[1]):
                 if data[row][col] in ['.', '+']:
-                    self.pelletList.append(Pellet(row, col))
+                    """
+                    if(random.random() > 0.8  and count < 5):
+                        self.pelletList.append(Pellet(row, col))
+                        count = count + 1
+                    """
                 elif data[row][col] in ['P', 'p']:
                     pp = PowerPellet(row, col)
                     self.pelletList.append(pp)
                     self.powerpellets.append(pp)
-                    
+        count = 0  
+        while(count < 5):
+            row = round(random.random()*data.shape[0]) - 1
+            col = round(random.random()*data.shape[1]) - 1
+            if data[row][col] in ['.', '+']:
+                self.pelletList.append(Pellet(row, col))
+                count = count + 1
     def readPelletfile(self, textfile):
         return np.loadtxt(textfile, dtype='<U1')
     

@@ -1,6 +1,6 @@
 import itertools
 import numpy as np
-
+import time
 
 GRID_W = 4
 GRID_H = 4
@@ -35,7 +35,9 @@ def move_deterministic(x,y,action):
     if 0 <= nx < GRID_H and 0 <= ny < GRID_W and (nx,ny) not in BLOCKED:
         return (nx,ny)
     return (x,y)
+start = time.perf_counter()
 
+print("Starting stuff")
 # pellet index mapping
 PELLET_POSITIONS = [
     (i,j) for i in range(GRID_H) for j in range(GRID_W)
@@ -43,7 +45,9 @@ PELLET_POSITIONS = [
 ]
 PELLET_INDEX = {pos:k for k,pos in enumerate(PELLET_POSITIONS)}
 NUM_PELLETS = len(PELLET_POSITIONS)
-
+print(NUM_PELLETS)
+end = time.perf_counter()
+print(f"overall time = {(end - start)}")
 ALL_STATES = []
 for px in range(GRID_H):
     for py in range(GRID_W):
@@ -51,12 +55,20 @@ for px in range(GRID_H):
         for gx in range(GRID_H):
             for gy in range(GRID_W):
                 if (gx,gy) in BLOCKED: continue
+                if (px,py) == (gx,gy) : continue
                 for pellet_mask in range(1<<NUM_PELLETS):
                     ALL_STATES.append((px,py,gx,gy,pellet_mask))
-
+print("Finished long loop")
 ALL_STATES = tuple(ALL_STATES)
+#print(ALL_STATES)
 INDEX = {s:i for i,s in enumerate(ALL_STATES)}
+print(len(INDEX))
 
+end = time.perf_counter()
+
+
+print(f"overall time = {(end - start)}")
+time.sleep(5)
 def is_terminal(state):
     px,py,gx,gy,pm = state
     if (px,py)==(gx,gy):

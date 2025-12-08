@@ -1,5 +1,8 @@
 import nodes
 import constants
+import random
+from collections import deque
+
 def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_positions, max_moves=10000):
     """
     Run a Pacman simulation and return the final score.
@@ -24,7 +27,9 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
     
     while moves < max_moves and pellets_remaining > 0:
         # Pacman collects pellets
-        print(pacman_pos)
+        print(f"pacman pos: {pacman_pos}")
+        print(f"ghost pos: {ghost_positions}")
+
 
         # Need to figure this stuff up, just doing the movement for now.
         """
@@ -59,13 +64,11 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
         # Move Pacman (simple strategy: move toward nearest pellet)
         # this will be replaced with the mdp stuff
         pacman_pos = move_pacman(self, game_map, pacman_pos, pellets_remaining)
-        
 
-        """
         # Move ghosts (simple chase strategy)
-        ghost_positions = [move_ghost(game_map, ghost_pos, pacman_pos, power_mode > 0) 
+        ghost_positions = [move_ghost(game_map, ghost_pos, pacman_pos, power_mode > 0)
                           for ghost_pos in ghost_positions]
-        """
+
         # Decrease power mode
         if power_mode > 0:
             power_mode -= 1
@@ -78,9 +81,7 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
     
     return score
 
-
 def move_pacman(self, game_map, current_pos, pellets_remaining):
-    import random
     rand = random.randrange(1, 5)
 
     # ^^^ this will be replaced with the output from the Policys
@@ -98,19 +99,75 @@ def move_pacman(self, game_map, current_pos, pellets_remaining):
     self.pacman.setPosition()
     return self.pacman.node.coords
 
-    
+
+def next_step(start, goal, game_map):
+    """this is a helper function that finds the next position for the ghosts to be in"""
+    if start == goal:
+        return start
+
+    queue = deque([start])
+    visited = {start: None}
+
+    while queue:
+        current = queue.popleft()
+
+        for neighbor in game_map[current]['neighbors']:
+            if neighbor not in visited:
+                visited[neighbor] = current
+                queue.append(neighbor)
+
+                if neighbor == goal:
+                    path = [neighbor]
+                    while visited[path[-1]] is not None:
+                        path.append(visited[path[-1]])
+                    path.reverse()
+
+                    if len(path) > 1:
+                        return path[1]
+                    return start
+
+    return start  # failsafe but like this sohuld never happen
 
 
 def move_ghost(self, game_map, ghost_pos, pacman_pos, flee_mode):
     """Move ghost toward (or away from) Pacman."""
-    neighbors = game_map[ghost_pos].get('neighbors', [])
-    if not neighbors:
-        return ghost_pos
-    
+    # neighbors = game_map[ghost_pos].get('neighbors', [])
+    # if not neighbors:
+    #     return ghost_pos
+
     # Simple strategy: move toward/away from Pacman
     if flee_mode:
         # Run away from Pacman
-        return max(neighbors, key=lambda pos: abs(pos[0] - pacman_pos[0]) + abs(pos[1] - pacman_pos[1]))
+        target = ghost_pos
+        best_dist = -1
+
+        for n in game_map[ghost_pos].get('neighbors', []):
+            d = abs(n[0] - pacman_pos[0]) + abs(n[1] - pacman_pos[1])
+            if d > best_dist:
+                best_dist = d
+                target = n
+        next_node = target
+
     else:
         # Chase Pacman
-        return min(neighbors, key=lambda pos: abs(pos[0] - pacman_pos[0]) + abs(pos[1] - pacman_pos[1]))
+        next_node = next_step(ghost_pos, pacman_pos, game_map)
+
+    dx = next_node[0] - ghost_pos[0]
+    dy = next_node[1] - ghost_pos[1]
+
+    if dx == 0 and dy == 0:
+        direction = None
+    elif dx == 0 and dy == -1:
+        direction = constants.UP
+    elif dx == 0 and dy == 1:
+        direction = constants.DOWN
+    elif dx == -1 and dy == 0:
+        direction = constants.LEFT
+    else:
+        direction = constants.RIGHT
+
+    # i dont understand how your code updates their location to go to the
+    # next ghost position, i legit have no clue bruh
+    self.ghosts.node = self.ghosts.getNewTarget(direction)
+    self.ghosts.setPosition()
+    return self.ghost.node.coords

@@ -74,9 +74,9 @@ class GameController(object):
         self.pellets = PelletGroup("maze1.txt")
         self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman)
         self.ghosts.blinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 0+14))
-        #self.ghosts.pinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
-        #self.ghosts.inky.setStartNode(self.nodes.getNodeFromTiles(0+11.5, 3+14))
-        #self.ghosts.clyde.setStartNode(self.nodes.getNodeFromTiles(4+11.5, 3+14))
+        self.ghosts.pinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
+        self.ghosts.inky.setStartNode(self.nodes.getNodeFromTiles(0+11.5, 3+14))
+        self.ghosts.clyde.setStartNode(self.nodes.getNodeFromTiles(4+11.5, 3+14))
         self.ghosts.setSpawnNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
@@ -178,12 +178,34 @@ class GameController(object):
                     # do simulator instead of other thing.
                     
                     self.textgroup.showText(self.sco_id)
-                    sco = run_pacman_simulation(self, self.nodes, self.pacman.node.coords, self.ghosts, self.pellets.pelletList, 10000)
+                    start = time.perf_counter()
+                    sco = 0
+                    best_score = 0
+                    worst_score = 10000000
+                    for i in range(self.slider.value):
+                        
+                        score = run_pacman_simulation(self, self.nodes, self.pacman.node.coords, self.ghosts, self.pellets.pelletList, 10000)
+                        self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
+                        self.resetLevel()
+                        del self.pellets
+                        self.pellets = PelletGroup("maze1.txt")
+                        if score > best_score:
+                            best_score = score
+                        if score < worst_score:
+                            worst_score = score
+                        print("run: ", i, " complete")
+                        sco += score
+                        print("run: ", i + 1, " complete, running average = ", sco / (i + 1))
+                    end = time.perf_counter()
                     
-                    self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
-                    #self.sco += 100
+                    sco = sco / self.slider.value
+                    print("overall score = ", sco)
+                    print("best_score = ", best_score)
+                    print("worst_score = ", worst_score)
+                    print(f"overall time = {(end - start)}")
                 elif event.key == K_k:
-                    print(self.nodes.nodesLUT)   
+                    for nod in self.nodes.nodesLUT:
+                        print(nod, self.nodes.nodesLUT[nod].coords)   
 
     def checkGhostEvents(self):
         for ghost in self.ghosts:

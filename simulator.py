@@ -34,9 +34,11 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
         for pellet in self.pellets.pelletList:
             if self.pacman.node.coords == pellet.coord:
                 if pellet.name == constants.POWERPELLET:
-                    self.pellets.pelletList.pop(pellet)
-                    power_mode = 1
+                    self.pellets.pelletList.remove(pellet)
+                    power_mode = 20
+                    score += 50
                 else:
+                    score += 10
                     self.pellets.pelletList.remove(pellet)
 
         # Need to figure this stuff up, just doing the movement for now.
@@ -58,17 +60,18 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
             current_node['fruit'] = False
         
         
-       
+       """ 
 
         # Check ghost collisions
-        if pacman_pos in ghost_positions:
-            if power_mode > 0:
-                score += 200  # Eat ghost
-                ghost_idx = ghost_positions.index(pacman_pos)
-                ghost_positions[ghost_idx].node = self.nodes.getNodeFromTiles(2+11.5, 3+14)
-            else:
-               return score
-        """     
+        for ghost in ghost_positions:
+            if self.pacman.node.coords == ghost.node.coords:
+                if power_mode > 0:
+                    score += 200  # Eat ghost
+                    ghost.node = self.nodes.getNodeFromTiles(2+11.5, 3+14)
+                else:
+                    #print("Score = ", score)
+                    return score
+            
         
         # Move Pacman (simple strategy: move toward nearest pellet)
         # this will be replaced with the mdp stuff
@@ -83,26 +86,12 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
         
         moves += 1
 
-        """self.clock.tick(30) / 1000.0
-        self.screen.blit(self.background, (0, 0))
-        self.pellets.render(self.screen)
-        if self.fruit is not None:
-            self.fruit.render(self.screen)
-        self.pacman.render(self.screen)
-        self.ghosts.render(self.screen)
-        self.textgroup.render(self.screen)
-        for i in range(len(self.lifesprites.images)):
-            x = self.lifesprites.images[i].get_width() * i
-            y = constants.SCREENHEIGHT - self.lifesprites.images[i].get_height()
-            self.screen.blit(self.lifesprites.images[i], (x, y))
-        events = pygame.event.get()
-        pygame_widgets.update(events)
-        pygame.display.update()"""
+        # Bonus for completing level
+        if len(self.pellets.pelletList) == 0:
+            score += 1000
+            print("Completed Level")
+            return score
 
-    
-    # Bonus for completing level
-    if pellets_remaining == 0:
-        score += 1000
     
     return score
 
@@ -124,41 +113,83 @@ def move_pacman(self, game_map, current_pos, pellets_remaining):
     #print("Rand = ", rand)
     #self.pacman.node = self.pacman.getNewTarget(direction)
     current_nod = self.pacman.node
-    self.pacman.node = next_step(self.pacman.node, self.pellets.pelletList[0], game_map)
+    best_length = 1000000
+    next_node = current_nod
+    for pellet in self.pellets.pelletList:
+        for nod in game_map.nodesLUT:
+            if pellet.coord == game_map.nodesLUT[nod].coords:
+                this_node, this_length = next_step(self.pacman.node, game_map.nodesLUT[nod], game_map)
+                if this_length < best_length:
+                    next_node = this_node
+                    best_length = this_length
+                break
+    
+    #self.pacman.node = next_step(self.pacman.node, self.pellets.pelletList[0], game_map)
+    self.pacman.node = next_node
     #self.pacman.setPosition()
-    print("Current: ", current_nod.coords, "Next: ", self.pacman.node.coords,"Goal: " ,self.pellets.pelletList[0].coord)
+    #print("Current: ", current_nod.coords, "Next: ", self.pacman.node.coords,"Goal: " ,self.pellets.pelletList[0].coord, "Length = ", best_length)
     return self.pacman.node
 
 
 def next_step(start, goal, game_map):
     """this is a helper function that finds the next position for the ghosts to be in"""
     if start == goal:
-        return start
+        return start, 0
+    queue = deque([(start, [start])])  # Stores (current_node, path_to_current_node)
+    visited = {start}  # Keeps track of visited nodes to avoid cycles
 
-    queue = deque([start])
+    while queue:
+        current_node, path = queue.popleft()
+        
+        if current_node == goal:
+            #print("found the path", path[1])
+            return path[1], len(path)
+        #print(current_node.coords)
+        #this is amoung the dumbest code I have ever written imo
+        for nod in game_map.nodesLUT:
+            if current_node.coords == game_map.nodesLUT[nod].coords:
+                for neighbor in game_map.nodesLUT[nod].neighbors.values():  
+                    if neighbor is not None:
+                        if neighbor not in visited:
+                            #print(neighbor.coords)
+                            visited.add(neighbor)
+                            queue.append((neighbor, path + [neighbor]))
+
+
+    #Zakhar algo
+    """queue = deque([start])
     visited = {start: None}
 
     while queue:
         current = queue.popleft()
         for node in game_map.nodesLUT.keys():
             for neighbor in game_map.nodesLUT[node].neighbors.values():
-                if neighbor is not None:
+                #if neighbor is not None:
                     #print(node, "has neighbor: ", neighbor.coords)
                     if neighbor not in visited:
                         visited[neighbor] = current
                         queue.append(neighbor)
 
                         if neighbor == goal:
+                            print("found goal", start.coords, goal.coords)
+                            for p in visited:
+                                if p is not None:
+                                    print(p.coords)
                             path = [neighbor]
                             while visited[path[-1]] is not None:
+                                print("path[-1] == ", path[-1].coords)
                                 path.append(visited[path[-1]])
                             path.reverse()
 
+                            print("Path = ")
+                            for p in path:
+                                print(p.coords)
+
                             if len(path) > 1:
                                 return path[1]
-                            return start
+                            return start"""
 
-    return start  # failsafe but like this sohuld never happen
+    return start, 1  # failsafe but like this sohuld never happen
 
 
 def move_ghost(self, game_map, ghost_pos, pacman_pos, flee_mode):
@@ -166,28 +197,29 @@ def move_ghost(self, game_map, ghost_pos, pacman_pos, flee_mode):
     # neighbors = game_map[ghost_pos].get('neighbors', [])
     # if not neighbors:
     #     return ghost_pos
-
+    
     # Simple strategy: move toward/away from Pacman
     if flee_mode:
         # Run away from Pacman
         target = ghost_pos
         best_dist = -1
 
-        for n in game_map[ghost_pos].get('neighbors', []):
-            d = abs(n[0] - pacman_pos[0]) + abs(n[1] - pacman_pos[1])
-            if d > best_dist:
-                best_dist = d
-                target = n
+        for n in ghost_pos.node.neighbors.values():
+            if n is not None:
+                d = abs(n.coords[0] - pacman_pos.coords[0]) + abs(n.coords[1] - pacman_pos.coords[1])
+                if d > best_dist:
+                    best_dist = d
+                    target = n
+        num_steps = best_dist
         next_node = target
 
     else:
         # Chase Pacman
         #print("The ghost_pos object is\n ", ghost_pos)
-        next_node = next_step(ghost_pos.node, self.pacman.node, game_map)
-    
+        next_node, num_steps = next_step(ghost_pos.node, self.pacman.node, game_map)
     #dx = next_node.node.coords[0] - ghost_pos.node.coords[0]
     #dy = next_node.node.coords[1] - ghost_pos.node.coords[1]
-    #print(ghost_pos, " current ghost node is ", ghost_pos.node.coords, "new node is ", next_node.coords)
+    #print(ghost_pos, " current ghost node is ", ghost_pos.node.coords, "new node is ", next_node.coords, "num_steps = ", num_steps)
     ghost_pos.node = next_node
 
 

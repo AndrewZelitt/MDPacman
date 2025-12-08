@@ -74,16 +74,16 @@ class GameController(object):
         self.pellets = PelletGroup("maze1.txt")
         self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman)
         self.ghosts.blinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 0+14))
-        self.ghosts.pinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
-        self.ghosts.inky.setStartNode(self.nodes.getNodeFromTiles(0+11.5, 3+14))
-        self.ghosts.clyde.setStartNode(self.nodes.getNodeFromTiles(4+11.5, 3+14))
+        #self.ghosts.pinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
+        #self.ghosts.inky.setStartNode(self.nodes.getNodeFromTiles(0+11.5, 3+14))
+        #self.ghosts.clyde.setStartNode(self.nodes.getNodeFromTiles(4+11.5, 3+14))
         self.ghosts.setSpawnNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
         self.nodes.denyAccessList(2+11.5, 3+14, LEFT, self.ghosts)
         self.nodes.denyAccessList(2+11.5, 3+14, RIGHT, self.ghosts)
-        self.ghosts.inky.startNode.denyAccess(RIGHT, self.ghosts.inky)
-        self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
+        #self.ghosts.inky.startNode.denyAccess(RIGHT, self.ghosts.inky)
+        #self.ghosts.clyde.startNode.denyAccess(LEFT, self.ghosts.clyde)
         self.nodes.denyAccessList(12, 14, UP, self.ghosts)
         self.nodes.denyAccessList(15, 14, UP, self.ghosts)
         self.nodes.denyAccessList(12, 26, UP, self.ghosts)
@@ -182,7 +182,8 @@ class GameController(object):
                     
                     self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
                     #self.sco += 100
-                    
+                elif event.key == K_k:
+                    print(self.nodes.nodesLUT)   
 
     def checkGhostEvents(self):
         for ghost in self.ghosts:
@@ -226,8 +227,8 @@ class GameController(object):
             self.pellets.numEaten += 1
             self.updateScore(pellet.points)
             
-            self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky) 
-            self.ghosts.clyde.startNode.allowAccess(LEFT, self.ghosts.clyde)
+            #self.ghosts.inky.startNode.allowAccess(RIGHT, self.ghosts.inky) 
+            #self.ghosts.clyde.startNode.allowAccess(LEFT, self.ghosts.clyde)
             self.pellets.pelletList.remove(pellet)
             if pellet.name == POWERPELLET:
                self.ghosts.startFreight()

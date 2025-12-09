@@ -16,7 +16,7 @@ from pygame_widgets.slider import Slider
 from pygame_widgets.textbox import TextBox
 from simulator import run_pacman_simulation
 import time
-
+import math
 class GameController(object):
     def __init__(self):
         pygame.init()
@@ -81,7 +81,7 @@ class GameController(object):
         nodes = NodeGroup("maze1.txt")
         nodes.setPortalPair((0, 17), (27, 17))
         pacman = Pacman(nodes.getNodeFromTiles(15, 26))
-        pellets = PelletGroup("maze1.txt")
+        pellets = PelletGroup("maze1.txt", nodes)
         ghosts = GhostGroup(nodes.getStartTempNode(), pacman)
         ghosts.randomizeSpawn(nodes, exclude_coords={(15.0, 26.0)})
 
@@ -124,6 +124,7 @@ class GameController(object):
         pellets = self._mdp_pellets
         ghosts = self._mdp_ghosts
         mdp = self._mdp_mdp
+        self.start_pacman_pos = self.pacman.node.coords
 
         if len(pellets.pelletList) == 0:
             print("No pellets left — ending MDP step-mode.")
@@ -148,10 +149,17 @@ class GameController(object):
         pellets_to_remove = []
         for pellet in pellets.pelletList:
             if pacman.node.coords == pellet.coord:
+            #if pacman.collideCheck(pellet):
                 pellets_to_remove.append(pellet)
                 if pellet.name == POWERPELLET:
                     ghosts.startFreight()
-
+            #dist = math.sqrt((pacman.node.position.x - pellet.position.x)**2 + (pacman.node.position.y - pellet.position.y)**2)
+            #print("Distance = ", dist)
+            if (pacman.node.position == pellet.position) != pacman.collideCheck(pellet):
+                print("Difference in logic ALERT")
+            
+        #print("Position= ", pacman.node.position)
+        #print("Coord = ", pacman.node.coords)
         # update local score for pellets
         for pellet in pellets_to_remove:
             if pellet.name == POWERPELLET:
@@ -161,6 +169,8 @@ class GameController(object):
 
         for pellet in pellets_to_remove:
             pellets.pelletList.remove(pellet)
+
+        pellets_to_remove.clear()
 
         # Check collisions (local step-mode handling)
         for ghost in ghosts:
@@ -211,6 +221,30 @@ class GameController(object):
             ghost.node = next_ghost_node
             ghost.setPosition()
 
+        # Collect pellets at current node
+        pellets_to_remove = []
+        for pellet in pellets.pelletList:
+            a = self.start_pacman_pos
+            b = self.pacman.node.coords
+            p = pellet.coord
+            if (a[0] == b[0] and p[0] == a[0] and min(a[1], b[1]) <= p[1] <= max(a[1], b[1])) or (a[1] == b[1] and p[1] == a[1] and min(a[0], b[0]) <= p[0] <= max(a[0], b[0])):
+             #if pacman.node.coords == pellet.coord:
+                pellets_to_remove.append(pellet)
+                if pellet.name == POWERPELLET:
+                    ghosts.startFreight()
+            if (pacman.node.coords == pellet.coord) != pacman.collideCheck(pellet):
+                print("Difference in logic ALERT")
+
+        # update local score for pellets
+        for pellet in pellets_to_remove:
+            if pellet.name == POWERPELLET:
+                self._mdp_score += getattr(pellet, 'points', 50)
+            else:
+                self._mdp_score += getattr(pellet, 'points', 10)
+
+        for pellet in pellets_to_remove:
+            pellets.pelletList.remove(pellet)
+
         # Render frame
         self.screen.blit(self._mdp_bg, (0, 0))
         pellets.render(self.screen)
@@ -218,7 +252,7 @@ class GameController(object):
         ghosts.render(self.screen)
         self.textgroup.render(self.screen)
         pygame.display.update()
-
+        self.clock.tick(30) / 1000.0
         self._mdp_moves_done += 1
         if self._mdp_moves_done >= self._mdp_max_moves:
             print("Reached max step count — ending MDP step-mode.")
@@ -242,10 +276,11 @@ class GameController(object):
         except Exception:
             start_node = self.nodes.getNodeFromTiles(15, 26)
         self.pacman = Pacman(start_node)
-        self.pellets = PelletGroup("maze1.txt")
+        self.pellets = PelletGroup("maze1.txt", self.nodes)
         self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman)
         # Randomize ghost spawn positions so they don't always start at the same spots
-        self.ghosts.randomizeSpawn(self.nodes, exclude_coords={(15.0, 26.0)})
+        exclude_coords = start_node.coords
+        self.ghosts.randomizeSpawn(self.nodes, exclude_coords)
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
         self.nodes.denyAccessList(2+11.5, 3+14, LEFT, self.ghosts)
@@ -256,7 +291,7 @@ class GameController(object):
         self.nodes.denyAccessList(15, 14, UP, self.ghosts)
         self.nodes.denyAccessList(12, 26, UP, self.ghosts)
         self.nodes.denyAccessList(15, 26, UP, self.ghosts)
-        self.slider = Slider(pygame.display.get_surface(), SCREENWIDTH/2 + 10, 5, 100, 10, min=1000, max=100000, step=1000)
+        self.slider = Slider(pygame.display.get_surface(), SCREENWIDTH/2 + 10, 5, 100, 10, min=1, max=10000, step=100)
         self.slidertxt = self.textgroup.addText("1000", WHITE, SCREENWIDTH/2 - 100, 0, 50)
         self.sco_id = self.textgroup.addText("Score: ", WHITE, SCREENWIDTH/2 - 100 , 20, 50)
         
@@ -348,6 +383,7 @@ class GameController(object):
                         self._mdp_init_step_mode()
                     else:
                         self._mdp_step()
+
                 elif event.key == K_k:
                     # Print some node info to console and show a short on-screen message
                     try:
@@ -363,11 +399,52 @@ class GameController(object):
                         # Fallback to plain prints
                         for nod in self.nodes.nodesLUT:
                             print(nod, self.nodes.nodesLUT[nod].coords)
+                elif event.key == K_m:
+                    # do simulator instead of other thing.
+                    
+                    self.textgroup.showText(self.sco_id)
+                    start = time.perf_counter()
+                    sco = 0
+                    best_score = 0
+                    worst_score = 10000000
+                    for i in range(self.slider.value):
+                        
+                        score = run_pacman_simulation(self, self.nodes, self.pacman.node.coords, self.ghosts, self.pellets.pelletList, 1000)
+                        self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
+                        self.resetLevel()
+                        del self.pellets
+                        self.pellets = PelletGroup("maze1.txt", self.nodes)
+                        del self.pacman
+                         # Randomize Pacman's start position among available nodes
+                        try:
+                            candidates = list(self.nodes.nodesLUT.values())
+                            start_node = random.choice(candidates)
+                        except Exception:
+                            start_node = self.nodes.getNodeFromTiles(15, 26)
+                        self.pacman = Pacman(start_node)
+                        exclude_coords = start_node.coords
+                        self.ghosts.randomizeSpawn(self.nodes, exclude_coords)
+                        if score > best_score:
+                            best_score = score
+                        if score < worst_score:
+                            worst_score = score
+                        #print("run: ", i, " complete")
+                        sco += score
+                        print("run: ", i + 1, " complete, score = ", score, " running average = ", sco / (i + 1))
+                        end = time.perf_counter()
+                        print(f"Time for run {(i+1)} = {(end - start)}")
+                    end = time.perf_counter()
+                    
+                    sco = sco / self.slider.value
+                    print("overall score = ", sco)
+                    print("best_score = ", best_score)
+                    print("worst_score = ", worst_score)
+                    print(f"overall time = {(end - start)}")
             elif event.type == MOUSEBUTTONDOWN:
                 # If step-mode active, advance one step on left-click inside the game window
                 if event.button == 1 and self._mdp_step_active:
                     self._mdp_step()
-
+            
     def checkGhostEvents(self):
         for ghost in self.ghosts:
             if self.pacman.collideGhost(ghost):
@@ -452,6 +529,7 @@ class GameController(object):
         self.pacman.render(self.screen)
         self.ghosts.render(self.screen)
         self.textgroup.render(self.screen)
+        #self.nodes.render(self.screen)
         for i in range(len(self.lifesprites.images)):
             x = self.lifesprites.images[i].get_width() * i
             y = SCREENHEIGHT - self.lifesprites.images[i].get_height()

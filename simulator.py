@@ -5,6 +5,7 @@ from collections import deque
 import pygame_widgets
 import pygame
 from mdp_value_iteration import ValueIterationPacmanMDP
+import time
 
 def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_positions, max_moves=10000):
     """
@@ -31,7 +32,7 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
     power_mode = 0  # Turns remaining in power mode
     moves = 0
 
-    # Configure Pacman's start position
+    """# Configure Pacman's start position
     try:
         if pacman_start is None or pacman_start == 'random':
             candidates = list(game_map.nodesLUT.values())
@@ -53,7 +54,7 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
                 pass
     except Exception:
         # if anything goes wrong, continue with existing pacman position
-        pass
+        pass"""
     
     while moves < max_moves and len(self.pellets.pelletList) > 0:
         # Pacman collects pellets at current location
@@ -98,7 +99,7 @@ def run_pacman_simulation(self, game_map, pacman_start, ghost_starts, pellet_pos
             score += 1000
             print("Completed Level")
             return score
-
+    del mdp_solver
     return score
 
 def move_pacman(self, game_map, mdp_solver, power_mode):
@@ -111,17 +112,20 @@ def move_pacman(self, game_map, mdp_solver, power_mode):
         mdp_solver: SimplePacmanMDPSolver instance
         power_mode: Current power mode turns remaining
     """
+    #start = time.perf_counter()
     # Get the best action using MDP policy
-    best_action = mdp_solver.get_next_move(
+    best_action = mdp_solver.compute_best_action(
         self.pacman.node, 
         self.pellets.pelletList, 
-        self.ghosts, 
-        power_mode
+        self.ghosts
     )
     
     # Move to the next node in the direction recommended by policy
     next_node = self.pacman.node.neighbors.get(best_action)
     
+    #end = time.perf_counter()
+
+    #print(f"overall time = {(end - start)}")
     if next_node is not None:
         self.pacman.node = next_node
     

@@ -31,7 +31,7 @@ import time
 class SimulationComparator:
     """Compare different Pacman policies."""
     
-    def __init__(self, num_runs=150, max_moves=10000):
+    def __init__(self, num_runs=30, max_moves=10000):
         self.num_runs = num_runs
         self.max_moves = max_moves
         self.nodes = NodeGroup("maze1.txt")
@@ -50,7 +50,7 @@ class SimulationComparator:
         nodes.setPortalPair((0, 17), (27, 17))
         
         pacman = Pacman(nodes.getNodeFromTiles(15, 26))
-        pellets = PelletGroup("maze1.txt")
+        pellets = PelletGroup("maze1.txt", nodes)
         ghosts = GhostGroup(nodes.getStartTempNode(), pacman)
         ghosts.randomizeSpawn(nodes, exclude_coords={(15.0, 26.0)})
         
@@ -122,15 +122,24 @@ class SimulationComparator:
         while moves < self.max_moves and len(pellets.pelletList) > 0:
             # Collect pellets
             pellets_to_remove = []
+            
             for pellet in pellets.pelletList:
                 if pacman.node.coords == pellet.coord:
+                #if pacman.collideCheck(pellet):
                     if pellet.name == POWERPELLET:
                         power_mode = 20
                         score += 50
                     else:
                         score += 10
                     pellets_to_remove.append(pellet)
-            
+            """pellet = pacman.eatPellets(pellets.pelletList)
+            #if pellet is not None:
+                if pellet.name == POWERPELLET:
+                    power_mode = 20
+                    score += 50
+                else:
+                    score += 10
+                pellets_to_remove.append(pellet)"""
             for pellet in pellets_to_remove:
                 pellets.pelletList.remove(pellet)
             
@@ -150,6 +159,7 @@ class SimulationComparator:
             next_node = pacman.node.neighbors.get(best_action)
             if next_node is not None:
                 pacman.node = next_node
+                #pacman.setPosition()
             
             # Move ghosts
             for ghost in ghosts:
@@ -342,7 +352,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Compare Pacman policies")
-    parser.add_argument("--runs", type=int, default=150, help="Number of simulation runs per policy")
+    parser.add_argument("--runs", type=int, default=75, help="Number of simulation runs per policy")
     parser.add_argument("--max-moves", type=int, default=10000, help="Maximum moves per simulation")
     
     args = parser.parse_args()

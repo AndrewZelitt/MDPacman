@@ -143,7 +143,47 @@ class GhostGroup(object):
         self.resetPoints()
 
     def setSpawnNode(self, node):
+        # Accept either a single node (old behavior) or an iterable of nodes
+        try:
+            # strings and single Node-like objects may be iterable, so check length
+            iter(node)
+            # If it's a node object it may still be iterable; handle list/tuple specifically
+            if isinstance(node, (list, tuple)):
+                if len(node) == len(self.ghosts):
+                    for ghost, n in zip(self.ghosts, node):
+                        ghost.setSpawnNode(n)
+                    return
+        except TypeError:
+            # not iterable
+            pass
+
+        # Fallback: single node for all ghosts (backwards compatible)
         for ghost in self:
+            ghost.setSpawnNode(node)
+
+    def randomizeSpawn(self, nodes, exclude_coords=None, seed=None):
+        """Choose random distinct spawn nodes from a NodeGroup.
+
+        - `nodes` is a `NodeGroup` instance.
+        - `exclude_coords` optional set of (x_tile, y_tile) tuples to avoid (e.g. Pacman start).
+        - `seed` optional RNG seed for reproducibility.
+        """
+        import random
+        if seed is not None:
+            random.seed(seed)
+
+        candidates = [n for n in nodes.nodesLUT.values()]
+        if exclude_coords:
+            candidates = [n for n in candidates if n.coords not in exclude_coords]
+
+        # If there are fewer candidates than ghosts, fall back to using all candidates
+        if len(candidates) < len(self.ghosts):
+            picks = candidates
+        else:
+            picks = random.sample(candidates, len(self.ghosts))
+
+        for ghost, node in zip(self.ghosts, picks):
+            ghost.setStartNode(node)
             ghost.setSpawnNode(node)
 
     def updatePoints(self):

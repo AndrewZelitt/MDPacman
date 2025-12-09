@@ -2,6 +2,7 @@ import pygame
 from pygame.locals import *
 from constants import *
 from pacman import Pacman
+import random
 from nodes import NodeGroup
 from pellets import PelletGroup
 from ghosts import GhostGroup
@@ -30,6 +31,17 @@ class GameController(object):
         self.sco = 0
         self.textgroup = TextGroup()
         self.lifesprites = LifeSprites(self.lives)
+        # MDP step-mode controls (used by the `S` key to step simulation one move at a time)
+        self._mdp_step_active = False
+        self._mdp_nodes = None
+        self._mdp_pacman = None
+        self._mdp_pellets = None
+        self._mdp_ghosts = None
+        self._mdp_mdp = None
+        self._mdp_bg = None
+        self._mdp_max_moves = 50
+        self._mdp_moves_done = 0
+        self._mdp_score = 0
 
     def restartGame(self):
         self.lives = 1
@@ -61,6 +73,159 @@ class GameController(object):
         self.background = pygame.surface.Surface(SCREENSIZE).convert()
         self.background.fill(BLACK)
 
+    def _mdp_init_step_mode(self):
+        """Initialize a fresh local game state for step-by-step MDP simulation."""
+        from mdp_value_iteration import ValueIterationPacmanMDP
+        from simulator import next_step
+
+        nodes = NodeGroup("maze1.txt")
+        nodes.setPortalPair((0, 17), (27, 17))
+        pacman = Pacman(nodes.getNodeFromTiles(15, 26))
+        pellets = PelletGroup("maze1.txt")
+        ghosts = GhostGroup(nodes.getStartTempNode(), pacman)
+        ghosts.randomizeSpawn(nodes, exclude_coords={(15.0, 26.0)})
+
+        mazesprites = MazeSprites("maze1.txt", "maze1_rotation.txt")
+        bg = pygame.surface.Surface(SCREENSIZE).convert()
+        bg = mazesprites.constructBackground(bg, self.level % 5)
+
+        mdp = ValueIterationPacmanMDP(nodes)
+
+        # store in controller state
+        self._mdp_step_active = True
+        self._mdp_nodes = nodes
+        self._mdp_pacman = pacman
+        self._mdp_pellets = pellets
+        self._mdp_ghosts = ghosts
+        self._mdp_mdp = mdp
+        self._mdp_bg = bg
+        self._mdp_moves_done = 0
+        # reset local step-mode score
+        self._mdp_score = 0
+
+        # Render initial state
+        self.screen.blit(self._mdp_bg, (0, 0))
+        self._mdp_pellets.render(self.screen)
+        self._mdp_pacman.render(self.screen)
+        self._mdp_ghosts.render(self.screen)
+        self.textgroup.render(self.screen)
+        pygame.display.update()
+        print("MDP step-mode initialized. Press S to advance one move.")
+
+    def _mdp_step(self):
+        """Advance one MDP move in the step-mode simulation."""
+        from simulator import next_step
+
+        if not self._mdp_step_active:
+            return
+
+        nodes = self._mdp_nodes
+        pacman = self._mdp_pacman
+        pellets = self._mdp_pellets
+        ghosts = self._mdp_ghosts
+        mdp = self._mdp_mdp
+
+        if len(pellets.pelletList) == 0:
+            print("No pellets left — ending MDP step-mode.")
+            self._mdp_step_active = False
+            return
+
+        # Compute best action and Q-values
+        try:
+            best_action, q_list = mdp.compute_best_action_with_qs(pacman.node, pellets.pelletList, ghosts)
+        except Exception:
+            best_action = mdp.compute_best_action(pacman.node, pellets.pelletList, ghosts)
+            q_list = []
+
+        if q_list:
+            qstr = ", ".join(f"{a}:{q:.1f}" for (a, q, _, _) in q_list)
+        else:
+            qstr = ""
+        msg = f"Step {self._mdp_moves_done}: Pacman {pacman.node.coords} -> action={best_action}"
+        print(msg + (f" | Qs: {qstr}" if qstr else ""))
+
+        # Collect pellets at current node
+        pellets_to_remove = []
+        for pellet in pellets.pelletList:
+            if pacman.node.coords == pellet.coord:
+                pellets_to_remove.append(pellet)
+                if pellet.name == POWERPELLET:
+                    ghosts.startFreight()
+
+        # update local score for pellets
+        for pellet in pellets_to_remove:
+            if pellet.name == POWERPELLET:
+                self._mdp_score += getattr(pellet, 'points', 50)
+            else:
+                self._mdp_score += getattr(pellet, 'points', 10)
+
+        for pellet in pellets_to_remove:
+            pellets.pelletList.remove(pellet)
+
+        # Check collisions (local step-mode handling)
+        for ghost in ghosts:
+            try:
+                collided = pacman.collideGhost(ghost)
+            except Exception:
+                # fallback to node-equality
+                collided = (pacman.node.coords == getattr(ghost.node, 'coords', None))
+
+            if collided:
+                if ghost.mode.current is FREIGHT:
+                    # Pacman eats ghost in freight mode — mirror real game behavior
+                    points = getattr(ghost, 'points', 200)
+                    self._mdp_score += points
+                    print(f"MDP step-mode: ate ghost for {points} points. total={self._mdp_score}")
+                    # Hide ghost and mark it spawning (don't teleport it directly)
+                    ghost.visible = False
+                    ghosts.updatePoints()
+                    try:
+                        ghost.startSpawn()
+                        nodes.allowHomeAccess(ghost)
+                    except Exception:
+                        # As a fallback, move ghost to a safe node away from Pacman
+                        try:
+                            ghost.node = nodes.getNodeFromTiles(2+11.5, 3+14)
+                            ghost.setPosition()
+                        except Exception:
+                            pass
+                else:
+                    # Pacman dies in local simulation
+                    print(f"MDP step-mode: Pacman died at {pacman.node.coords}. score={self._mdp_score}")
+                    # print the final score for this move
+                    print(f"Score: {self._mdp_score}")
+                    self._mdp_step_active = False
+                    return
+
+        # Apply pacman move (node-step)
+        next_node = pacman.node.neighbors.get(best_action)
+        if next_node is not None:
+            pacman.node = next_node
+            pacman.setPosition()
+
+        # Move ghosts one step
+        for ghost in ghosts:
+            if getattr(ghost, 'node', None) is None:
+                continue
+            next_ghost_node, _ = next_step(ghost.node, pacman.node, nodes)
+            ghost.node = next_ghost_node
+            ghost.setPosition()
+
+        # Render frame
+        self.screen.blit(self._mdp_bg, (0, 0))
+        pellets.render(self.screen)
+        pacman.render(self.screen)
+        ghosts.render(self.screen)
+        self.textgroup.render(self.screen)
+        pygame.display.update()
+
+        self._mdp_moves_done += 1
+        if self._mdp_moves_done >= self._mdp_max_moves:
+            print("Reached max step count — ending MDP step-mode.")
+            self._mdp_step_active = False
+        # print current score after the move
+        print(f"Score: {self._mdp_score}")
+
     def startGame(self):
         self.setBackground()
         self.mazesprites = MazeSprites("maze1.txt", "maze1_rotation.txt")
@@ -70,14 +235,17 @@ class GameController(object):
         homekey = self.nodes.createHomeNodes(11.5, 14)
         self.nodes.connectHomeNodes(homekey, (12,14), LEFT)
         self.nodes.connectHomeNodes(homekey, (15,14), RIGHT)
-        self.pacman = Pacman(self.nodes.getNodeFromTiles(15, 26))
+        # Randomize Pacman's start position among available nodes
+        try:
+            candidates = list(self.nodes.nodesLUT.values())
+            start_node = random.choice(candidates)
+        except Exception:
+            start_node = self.nodes.getNodeFromTiles(15, 26)
+        self.pacman = Pacman(start_node)
         self.pellets = PelletGroup("maze1.txt")
         self.ghosts = GhostGroup(self.nodes.getStartTempNode(), self.pacman)
-        self.ghosts.blinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 0+14))
-        self.ghosts.pinky.setStartNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
-        self.ghosts.inky.setStartNode(self.nodes.getNodeFromTiles(0+11.5, 3+14))
-        self.ghosts.clyde.setStartNode(self.nodes.getNodeFromTiles(4+11.5, 3+14))
-        self.ghosts.setSpawnNode(self.nodes.getNodeFromTiles(2+11.5, 3+14))
+        # Randomize ghost spawn positions so they don't always start at the same spots
+        self.ghosts.randomizeSpawn(self.nodes, exclude_coords={(15.0, 26.0)})
         self.nodes.denyHomeAccess(self.pacman)
         self.nodes.denyHomeAccessList(self.ghosts)
         self.nodes.denyAccessList(2+11.5, 3+14, LEFT, self.ghosts)
@@ -104,24 +272,27 @@ class GameController(object):
         #dt = self.clock.tick(1000) / 1000.0
         self.textgroup.update(dt)
         self.pellets.update(dt)
-        if not self.pause.paused:
-            self.ghosts.update(dt)
-            if self.fruit is not None:
-                self.fruit.update(dt)
-            self.checkPelletEvents()
-            self.checkGhostEvents()
-            self.checkFruitEvents()
 
+        # Update Pacman first so pellet pickup and mode changes happen before ghosts move.
         if self.pacman.alive:
             if not self.pause.paused:
-                #self.pause.setPause()
-                #emulating needing to do the calculations every time.
-                #need to keep compute time to sub 100 ms (shouldnt be too bad)
-                #largecalculations()
-                #self.pause.setPause()
                 self.pacman.update(dt)
         else:
             self.pacman.update(dt)
+
+        if not self.pause.paused:
+            if self.fruit is not None:
+                self.fruit.update(dt)
+            # Handle pellet pickup immediately after Pacman moved; this can enable freight mode
+            # before ghosts take their step (so Pacman can eat nearby ghosts).
+            self.checkPelletEvents()
+
+            # Now update ghosts (they will react to freight if started above)
+            self.ghosts.update(dt)
+
+            # Check ghost collisions after ghosts moved
+            self.checkGhostEvents()
+            self.checkFruitEvents()
 
         afterPauseMethod = self.pause.update(dt)
         if afterPauseMethod is not None:
@@ -149,9 +320,6 @@ class GameController(object):
         print(f"Pacman Position:\n {round(self.pacman.position.x/TILEWIDTH)} , {round(self.pacman.position.y/TILEHEIGHT)}")
         print("\n")
         """
-        
-
-    
 
     def updateScore(self, points):
         self.score += points
@@ -175,37 +343,30 @@ class GameController(object):
                             self.textgroup.showText(PAUSETXT)
                             self.hideEntities()
                 elif event.key == K_s:
-                    # do simulator instead of other thing.
-                    
-                    self.textgroup.showText(self.sco_id)
-                    start = time.perf_counter()
-                    sco = 0
-                    best_score = 0
-                    worst_score = 10000000
-                    for i in range(self.slider.value):
-                        
-                        score = run_pacman_simulation(self, self.nodes, self.pacman.node.coords, self.ghosts, self.pellets.pelletList, 10000)
-                        self.textgroup.updateText(self.sco_id, "Score: " + str(self.sco))
-                        self.resetLevel()
-                        del self.pellets
-                        self.pellets = PelletGroup("maze1.txt")
-                        if score > best_score:
-                            best_score = score
-                        if score < worst_score:
-                            worst_score = score
-                        print("run: ", i, " complete")
-                        sco += score
-                        print("run: ", i + 1, " complete, running average = ", sco / (i + 1))
-                    end = time.perf_counter()
-                    
-                    sco = sco / self.slider.value
-                    print("overall score = ", sco)
-                    print("best_score = ", best_score)
-                    print("worst_score = ", worst_score)
-                    print(f"overall time = {(end - start)}")
+                    # Step-mode: initialize on first press, then each subsequent press advances one MDP move
+                    if not self._mdp_step_active:
+                        self._mdp_init_step_mode()
+                    else:
+                        self._mdp_step()
                 elif event.key == K_k:
-                    for nod in self.nodes.nodesLUT:
-                        print(nod, self.nodes.nodesLUT[nod].coords)   
+                    # Print some node info to console and show a short on-screen message
+                    try:
+                        total = len(self.nodes.nodesLUT)
+                        sample = []
+                        for i, nod in enumerate(self.nodes.nodesLUT):
+                            if i >= 4:
+                                break
+                            sample.append(self.nodes.nodesLUT[nod].coords)
+                        print(f"Nodes: {total}, sample coords: {sample}")
+                        self.textgroup.addText(f"Nodes: {total}", WHITE, 0, 0, 18, time=3)
+                    except Exception:
+                        # Fallback to plain prints
+                        for nod in self.nodes.nodesLUT:
+                            print(nod, self.nodes.nodesLUT[nod].coords)
+            elif event.type == MOUSEBUTTONDOWN:
+                # If step-mode active, advance one step on left-click inside the game window
+                if event.button == 1 and self._mdp_step_active:
+                    self._mdp_step()
 
     def checkGhostEvents(self):
         for ghost in self.ghosts:
@@ -267,6 +428,23 @@ class GameController(object):
         self.ghosts.hide()
 
     def render(self):
+        # If MDP step-mode is active, render the step-mode frame instead of the live game
+        if getattr(self, '_mdp_step_active', False):
+            try:
+                self.screen.blit(self._mdp_bg, (0, 0))
+                if self._mdp_pellets is not None:
+                    self._mdp_pellets.render(self.screen)
+                if self._mdp_pacman is not None:
+                    self._mdp_pacman.render(self.screen)
+                if self._mdp_ghosts is not None:
+                    self._mdp_ghosts.render(self.screen)
+                self.textgroup.render(self.screen)
+                pygame.display.update()
+                return
+            except Exception:
+                # Fall back to normal render if anything goes wrong
+                pass
+
         self.screen.blit(self.background, (0, 0))
         self.pellets.render(self.screen)
         if self.fruit is not None:

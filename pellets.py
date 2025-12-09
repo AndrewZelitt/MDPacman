@@ -66,7 +66,7 @@ class PelletGroup(object):
                     self.pelletList.append(pp)
                     self.powerpellets.append(pp)
         count = 0  
-        while(count < 5):
+        while(count < 5): #controls num of pellets added
             row = round(random.random()*data.shape[0]) - 1
             col = round(random.random()*data.shape[1]) - 1
             if data[row][col] in ['.', '+']:

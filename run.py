@@ -39,7 +39,7 @@ class GameController(object):
         self._mdp_ghosts = None
         self._mdp_mdp = None
         self._mdp_bg = None
-        self._mdp_max_moves = 50
+        self._mdp_max_moves = 120
         self._mdp_moves_done = 0
         self._mdp_score = 0
 
@@ -148,15 +148,15 @@ class GameController(object):
         # Collect pellets at current node
         pellets_to_remove = []
         for pellet in pellets.pelletList:
-            if pacman.node.coords == pellet.coord:
+            if pacman.node.coords == pellet.coord or pacman.collideCheck(pellet):
             #if pacman.collideCheck(pellet):
                 pellets_to_remove.append(pellet)
                 if pellet.name == POWERPELLET:
                     ghosts.startFreight()
             #dist = math.sqrt((pacman.node.position.x - pellet.position.x)**2 + (pacman.node.position.y - pellet.position.y)**2)
             #print("Distance = ", dist)
-            if (pacman.node.position == pellet.position) != pacman.collideCheck(pellet):
-                print("Difference in logic ALERT")
+               
+
             
         #print("Position= ", pacman.node.position)
         #print("Coord = ", pacman.node.coords)
@@ -170,7 +170,7 @@ class GameController(object):
         for pellet in pellets_to_remove:
             pellets.pelletList.remove(pellet)
 
-        pellets_to_remove.clear()
+        #pellets_to_remove.clear()
 
         # Check collisions (local step-mode handling)
         for ghost in ghosts:
@@ -186,6 +186,7 @@ class GameController(object):
                     points = getattr(ghost, 'points', 200)
                     self._mdp_score += points
                     print(f"MDP step-mode: ate ghost for {points} points. total={self._mdp_score}")
+                    
                     # Hide ghost and mark it spawning (don't teleport it directly)
                     ghost.visible = False
                     ghosts.updatePoints()
@@ -205,10 +206,67 @@ class GameController(object):
                     # print the final score for this move
                     print(f"Score: {self._mdp_score}")
                     self._mdp_step_active = False
+                    self.textgroup.showText(PAUSETXT)
                     return
+        """
+        self.p_success = 0.98
+        i = 0
+        j = 0
+        act = best_action
+        random_float = random.random();
+        if act == UP:
+            if random_float <= self.p_success :
+                j += 1
+            # biggest num
+            elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                i -= 1
+            elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                j -= 1
+            elif random_float > self.p_success :
+                i += 1
+        elif act == DOWN:
+            if random_float <= self.p_success:
+                j -= 1
+            elif random_float > self.p_success and random_float > self.p_success + 2.0*(1-self.p_success)/3.0 :
+                i += 1
+            elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                i -= 1
+            elif random_float > self.p_success :
+                j += 1
+        elif act == LEFT:
+            if random_float <= self.p_success:
+                i -= 1
+            elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                i += 1
+            elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                j -= 1
+            elif random_float > self.p_success :
+                j += 1
+        elif act == RIGHT:
+            if random_float <= self.p_success:
+                i += 1
+            elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                i -= 1
+            elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                j -= 1
+            elif random_float > self.p_success :
+                j += 1
 
+        if j == 1:
+            action = UP
+        elif j == -1:
+            action = DOWN
+        if i == 1:
+            action = RIGHT
+        if i == -1:
+            action = LEFT
+        if (i,j) == (0,0):
+            action = best_action
+        print(i,j)
+        """
+        action = best_action
         # Apply pacman move (node-step)
-        next_node = pacman.node.neighbors.get(best_action)
+        next_node = pacman.node.neighbors.get(action)
         if next_node is not None:
             pacman.node = next_node
             pacman.setPosition()
@@ -256,9 +314,14 @@ class GameController(object):
         self._mdp_moves_done += 1
         if self._mdp_moves_done >= self._mdp_max_moves:
             print("Reached max step count — ending MDP step-mode.")
+            self.textgroup.showText(PAUSETXT)
             self._mdp_step_active = False
+        if len(self._mdp_pellets.pelletList) == 0:
+            self.textgroup.showText(PAUSETXT)
+            self._mdp_step_active == False
         # print current score after the move
         print(f"Score: {self._mdp_score}")
+        
 
     def startGame(self):
         self.setBackground()
@@ -303,8 +366,12 @@ class GameController(object):
 
     #this is the main loop of the program this is where a lot of code will go that will give information.
     def update(self):
-        dt = self.clock.tick(30) / 1000.0
+        dt = self.clock.tick(3.5) / 1000.0
         #dt = self.clock.tick(1000) / 1000.0
+        if  self._mdp_step_active:
+            self._mdp_step()
+
+           
         self.textgroup.update(dt)
         self.pellets.update(dt)
 
@@ -369,14 +436,18 @@ class GameController(object):
                 exit()
             elif event.type == KEYDOWN:
                 if event.key == K_SPACE:
-                    if self.pacman.alive:
+                    self.textgroup.hideText()
+                    if not self._mdp_step_active:
+                        self._mdp_init_step_mode()
+
+                    """if self.pacman.alive:
                         self.pause.setPause(playerPaused=True)
                         if not self.pause.paused:
                             self.textgroup.hideText()
                             self.showEntities()
                         else:
                             self.textgroup.showText(PAUSETXT)
-                            self.hideEntities()
+                            self.hideEntities()"""
                 elif event.key == K_s:
                     # Step-mode: initialize on first press, then each subsequent press advances one MDP move
                     if not self._mdp_step_active:

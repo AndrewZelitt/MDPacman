@@ -65,13 +65,16 @@ class SimulationComparator:
         print("="*60)
         
         for run_num in range(self.num_runs):
+            start_time = time.time()
             pacman, pellets, ghosts, nodes = self.create_game_state()
             
             score = self._simulate_mdp_moves(pacman, pellets, ghosts, nodes)
             scores.append(score)
             
             print(f"Run {run_num + 1}: Score = {score} | Pellets left: {len(pellets.pelletList)-4}")
-        
+            end_time = time.time()
+            
+            print(f"Run {run_num + 1} execution time: {end_time - start_time:.2f} seconds")
         return scores
     
     def run_random_simulation(self):
@@ -101,13 +104,18 @@ class SimulationComparator:
         print("="*60)
         
         for run_num in range(self.num_runs):
+            start_time = time.time()
+            
+            
             pacman, pellets, ghosts, nodes = self.create_game_state()
             
             score = self._simulate_greedy_pellet_moves(pacman, pellets, ghosts, nodes)
             scores.append(score)
             
             print(f"Run {run_num + 1}: Score = {score} | Pellets left: {len(pellets.pelletList)-4}")
-        
+            end_time = time.time()
+            
+            print(f"\n\Run {run_num + 1} execution time: {end_time - start_time:.2f} seconds")
         return scores
     
     def _simulate_mdp_moves(self, pacman, pellets, ghosts, nodes):
@@ -120,12 +128,12 @@ class SimulationComparator:
         mdp_solver = ValueIterationPacmanMDP(nodes)
         
         while moves < self.max_moves and len(pellets.pelletList) > 0:
+            #print("Score = ", score, "Pacman Pos = ", pacman.node.coords, "Moves = ", moves)
             # Collect pellets
             pellets_to_remove = []
             
             for pellet in pellets.pelletList:
-                if pacman.node.coords == pellet.coord:
-                #if pacman.collideCheck(pellet):
+                if pacman.node.coords == pellet.coord or pacman.collideCheck(pellet):
                     if pellet.name == POWERPELLET:
                         power_mode = 20
                         score += 50
@@ -142,25 +150,90 @@ class SimulationComparator:
                 pellets_to_remove.append(pellet)"""
             for pellet in pellets_to_remove:
                 pellets.pelletList.remove(pellet)
-            
+            del pellets_to_remove
             # Check ghost collisions
             for ghost in ghosts:
                 if getattr(ghost, 'node', None) is None:
                     continue
-                if pacman.node.coords == ghost.node.coords:
+                if pacman.node.coords == ghost.node.coords or pacman.collideCheck(ghost):
                     if power_mode > 0:
                         score += 200
                         power_mode -= 1
+                        ghost.node = None
                     else:
                         return score
             
             # Get MDP move using value iteration (recomputes policy against current ghost positions)
             best_action = mdp_solver.compute_best_action(pacman.node, pellets.pelletList, ghosts)
+            """
+            self.p_success = 0.98
+            i = 0
+            j = 0
+            act = best_action
+            random_float = random.random();
+            if act == UP:
+                if random_float <= self.p_success :
+                    j += 1
+                # biggest num
+                elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                    i -= 1
+                elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                    j -= 1
+                elif random_float > self.p_success :
+                    i += 1
+            elif act == DOWN:
+                if random_float <= self.p_success:
+                    j -= 1
+                elif random_float > self.p_success and random_float > self.p_success + 2.0*(1-self.p_success)/3.0 :
+                    i += 1
+                elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                    i -= 1
+                elif random_float > self.p_success :
+                    j += 1
+            elif act == LEFT:
+                if random_float <= self.p_success:
+                    i -= 1
+                elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                    i += 1
+                elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                    j -= 1
+                elif random_float > self.p_success :
+                    j += 1
+            elif act == RIGHT:
+                if random_float <= self.p_success:
+                    i += 1
+                elif random_float > self.p_success and random_float > self.p_success + 2.0*(1.0-self.p_success)/3.0 :
+                    i -= 1
+                elif random_float > self.p_success and random_float > self.p_success + (1.0-self.p_success)/3.0 :
+                    j -= 1
+                elif random_float > self.p_success :
+                    j += 1
+
+            if j == 1:
+                action = UP
+            elif j == -1:
+                action = DOWN
+            if i == 1:
+                action = RIGHT
+            if i == -1:
+                action = LEFT
+            if (i,j) == (0,0):
+                action = best_action
+
+            
+            next_node = pacman.node.neighbors.get(action)
+            """
             next_node = pacman.node.neighbors.get(best_action)
             if next_node is not None:
                 pacman.node = next_node
                 #pacman.setPosition()
-            
+
+            if power_mode == 0:
+                for ghost in ghosts:
+                    if getattr(ghost, 'node', None) is None:
+                        choices = [v for v in self.nodes.nodesLUT.values() if v != pacman.node]
+                        result = random.choice(choices)
+                        ghost.node = result
             # Move ghosts
             for ghost in ghosts:
                 if getattr(ghost, 'node', None) is None:
@@ -170,6 +243,7 @@ class SimulationComparator:
             
             if power_mode > 0:
                 power_mode -= 1
+            
             
             moves += 1
             
@@ -189,10 +263,11 @@ class SimulationComparator:
             # Collect pellets
             pellets_to_remove = []
             for pellet in pellets.pelletList:
-                if pacman.node.coords == pellet.coord:
+                if pacman.node.coords == pellet.coord or pacman.collideCheck(pellet):
                     if pellet.name == POWERPELLET:
                         power_mode = 20
                         score += 50
+                        ghost.node = None
                     else:
                         score += 10
                     pellets_to_remove.append(pellet)
@@ -200,14 +275,21 @@ class SimulationComparator:
             for pellet in pellets_to_remove:
                 pellets.pelletList.remove(pellet)
             
+            if power_mode == 0:
+                for ghost in ghosts:
+                    if getattr(ghost, 'node', None) is None:
+                        choices = [v for v in self.nodes.nodesLUT.values() if v != pacman.node]
+                        result = random.choice(choices)
+                        ghost.node = result
             # Check ghost collisions
             for ghost in ghosts:
                 if getattr(ghost, 'node', None) is None:
                     continue
-                if pacman.node.coords == ghost.node.coords:
+                if pacman.node.coords == ghost.node.coords or pacman.collideCheck(ghost):
                     if power_mode > 0:
                         score += 200
                         power_mode -= 1
+                        ghost.node = None
                     else:
                         return score
             
@@ -256,10 +338,11 @@ class SimulationComparator:
             # Collect pellets
             pellets_to_remove = []
             for pellet in pellets.pelletList:
-                if pacman.node.coords == pellet.coord:
+                if pacman.node.coords == pellet.coord or pacman.collideCheck(pellet):
                     if pellet.name == POWERPELLET:
                         power_mode = 20
                         score += 50
+                        ghost.node = None
                     else:
                         score += 10
                     pellets_to_remove.append(pellet)
@@ -267,11 +350,17 @@ class SimulationComparator:
             for pellet in pellets_to_remove:
                 pellets.pelletList.remove(pellet)
             
+            if power_mode == 0:
+                for ghost in ghosts:
+                    if getattr(ghost, 'node', None) is None:
+                        choices = [v for v in self.nodes.nodesLUT.values() if v != pacman.node]
+                        result = random.choice(choices)
+                        ghost.node = result
             # Check ghost collisions
             for ghost in ghosts:
                 if getattr(ghost, 'node', None) is None:
                     continue
-                if pacman.node.coords == ghost.node.coords:
+                if pacman.node.coords == ghost.node.coords or pacman.collideCheck(ghost):
                     if power_mode > 0:
                         score += 200
                         power_mode -= 1
@@ -353,7 +442,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Compare Pacman policies")
     parser.add_argument("--runs", type=int, default=75, help="Number of simulation runs per policy")
-    parser.add_argument("--max-moves", type=int, default=10000, help="Maximum moves per simulation")
+    parser.add_argument("--max-moves", type=int, default=500, help="Maximum moves per simulation")
     
     args = parser.parse_args()
     
